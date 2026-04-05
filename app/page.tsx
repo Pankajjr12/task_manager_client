@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import TaskItem from "@/components/TaskItem";
 import TaskForm from "@/components/TaskForm";
 
-const API_URL = "http://localhost:5000/tasks";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function HomePage() {
   const { token } = useAuth();
@@ -24,28 +24,33 @@ export default function HomePage() {
   const [page, setPage] = useState(1);
   const limit = 10;
 
+  // ✅ use token (not localStorage mismatch)
   const getHeaders = () => ({
     "Content-Type": "application/json",
-    Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    Authorization: `Bearer ${token}`,
   });
 
+  // ✅ fetch tasks (safe + correct endpoint)
   const fetchTasks = async () => {
-    let url = `${API_URL}?page=${page}&limit=${limit}&search=${search}`;
+    try {
+      let url = `${API_URL}/tasks?page=${page}&limit=${limit}&search=${search}`;
 
-    if (filter !== "all") {
-      url += `&status=${filter === "completed"}`;
-    }
+      if (filter !== "all") {
+        url += `&status=${filter === "completed"}`;
+      }
 
-    const res = await fetch(url, { headers: getHeaders() });
-    const data = await res.json();
+      const res = await fetch(url, { headers: getHeaders() });
 
-    if (data?.error) {
+      if (!res.ok) throw new Error("Failed to fetch tasks");
+
+      const data = await res.json();
+
+      setTasks(data.data || []);
+      setTotalPages(data.totalPages || 1);
+    } catch (err) {
+      console.error(err);
       router.push("/login");
-      return;
     }
-
-    setTasks(data.data);
-    setTotalPages(data.totalPages);
   };
 
   useEffect(() => {
@@ -67,43 +72,63 @@ export default function HomePage() {
     setPage(1);
   };
 
-  //  crud here
+  // ✅ CREATE
   const addTask = async (task: any) => {
-    await fetch(API_URL, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(task),
-    });
-    fetchTasks();
+    try {
+      await fetch(`${API_URL}/tasks`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(task),
+      });
+      fetchTasks();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
+  // ✅ UPDATE
   const updateTask = async (id: string, task: any) => {
-    await fetch(`${API_URL}/${id}`, {
-      method: "PATCH",
-      headers: getHeaders(),
-      body: JSON.stringify(task),
-    });
-    fetchTasks();
+    try {
+      await fetch(`${API_URL}/tasks/${id}`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(task),
+      });
+      fetchTasks();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
+  // ✅ TOGGLE
   const toggleTask = async (id: string) => {
-    await fetch(`${API_URL}/${id}/toggle`, {
-      method: "PATCH",
-      headers: getHeaders(),
-    });
-    fetchTasks();
+    try {
+      await fetch(`${API_URL}/tasks/${id}/toggle`, {
+        method: "PATCH",
+        headers: getHeaders(),
+      });
+      fetchTasks();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
+  // ✅ DELETE
   const deleteTask = async (id: string) => {
-    await fetch(`${API_URL}/${id}`, {
-      method: "DELETE",
-      headers: getHeaders(),
-    });
-    fetchTasks();
+    try {
+      await fetch(`${API_URL}/tasks/${id}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
+      fetchTasks();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
     <div className="p-4">
+      {/* 🔍 Search */}
       <input
         type="text"
         placeholder="Search by title..."
@@ -112,6 +137,7 @@ export default function HomePage() {
         className="border p-2 mb-3 w-full"
       />
 
+      {/* 🔽 Filter */}
       <div className="flex gap-2 mb-4">
         <button onClick={() => handleFilter("all")} className="border px-2">
           All
@@ -129,6 +155,7 @@ export default function HomePage() {
         </button>
       </div>
 
+      {/* ➕ Add Task */}
       <button
         onClick={() => {
           setEditTask(null);
@@ -147,6 +174,7 @@ export default function HomePage() {
         editTask={editTask}
       />
 
+      {/* 📋 Task List */}
       {tasks.map((t) => (
         <TaskItem
           key={t.id}
@@ -160,8 +188,11 @@ export default function HomePage() {
         />
       ))}
 
-      {tasks.length === 0 && <p className="text-gray-500">No tasks found</p>}
+      {tasks.length === 0 && (
+        <p className="text-gray-500">No tasks found</p>
+      )}
 
+      {/* 📄 Pagination */}
       <div className="flex justify-center items-center gap-4 mt-4">
         <button
           disabled={page === 1}
