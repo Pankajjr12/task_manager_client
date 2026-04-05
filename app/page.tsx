@@ -1,65 +1,188 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import TaskItem from "@/components/TaskItem";
+import TaskForm from "@/components/TaskForm";
+
+const API_URL = "http://localhost:5000/tasks";
+
+export default function HomePage() {
+  const { token } = useAuth();
+  const router = useRouter();
+
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const [open, setOpen] = useState(false);
+  const [editTask, setEditTask] = useState<any>(null);
+
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+
+  const [page, setPage] = useState(1);
+  const limit = 10;
+
+  const getHeaders = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+  });
+
+  const fetchTasks = async () => {
+    let url = `${API_URL}?page=${page}&limit=${limit}&search=${search}`;
+
+    if (filter !== "all") {
+      url += `&status=${filter === "completed"}`;
+    }
+
+    const res = await fetch(url, { headers: getHeaders() });
+    const data = await res.json();
+
+    if (data?.error) {
+      router.push("/login");
+      return;
+    }
+
+    setTasks(data.data);
+    setTotalPages(data.totalPages);
+  };
+
+  useEffect(() => {
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    fetchTasks();
+  }, [token, page, search, filter]);
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const handleFilter = (value: string) => {
+    setFilter(value);
+    setPage(1);
+  };
+
+  //  crud here
+  const addTask = async (task: any) => {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(task),
+    });
+    fetchTasks();
+  };
+
+  const updateTask = async (id: string, task: any) => {
+    await fetch(`${API_URL}/${id}`, {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify(task),
+    });
+    fetchTasks();
+  };
+
+  const toggleTask = async (id: string) => {
+    await fetch(`${API_URL}/${id}/toggle`, {
+      method: "PATCH",
+      headers: getHeaders(),
+    });
+    fetchTasks();
+  };
+
+  const deleteTask = async (id: string) => {
+    await fetch(`${API_URL}/${id}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+    fetchTasks();
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="p-4">
+      <input
+        type="text"
+        placeholder="Search by title..."
+        value={search}
+        onChange={(e) => handleSearch(e.target.value)}
+        className="border p-2 mb-3 w-full"
+      />
+
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => handleFilter("all")} className="border px-2">
+          All
+        </button>
+
+        <button
+          onClick={() => handleFilter("completed")}
+          className="border px-2"
+        >
+          Completed
+        </button>
+
+        <button onClick={() => handleFilter("pending")} className="border px-2">
+          Pending
+        </button>
+      </div>
+
+      <button
+        onClick={() => {
+          setEditTask(null);
+          setOpen(true);
+        }}
+        className="mb-4 bg-green-500 text-white px-3 py-1 rounded"
+      >
+        + Add Task
+      </button>
+
+      <TaskForm
+        open={open}
+        onClose={() => setOpen(false)}
+        onAdd={addTask}
+        onUpdate={updateTask}
+        editTask={editTask}
+      />
+
+      {tasks.map((t) => (
+        <TaskItem
+          key={t.id}
+          task={t}
+          onToggle={toggleTask}
+          onDelete={deleteTask}
+          onEdit={(task: any) => {
+            setEditTask(task);
+            setOpen(true);
+          }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      ))}
+
+      {tasks.length === 0 && <p className="text-gray-500">No tasks found</p>}
+
+      <div className="flex justify-center items-center gap-4 mt-4">
+        <button
+          disabled={page === 1}
+          onClick={() => setPage((p) => p - 1)}
+          className="px-3 py-1 border"
+        >
+          Prev
+        </button>
+
+        <span className="font-semibold">
+          Page {page} of {totalPages}
+        </span>
+
+        <button
+          disabled={page >= totalPages}
+          onClick={() => setPage((p) => p + 1)}
+          className="px-3 py-1 border"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }
