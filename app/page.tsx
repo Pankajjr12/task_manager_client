@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import TaskItem from "@/components/TaskItem";
 import TaskForm from "@/components/TaskForm";
+import toast from "react-hot-toast";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function HomePage() {
-  const { token } = useAuth();
+  const { token, loading } = useAuth();
   const router = useRouter();
 
   const [tasks, setTasks] = useState<any[]>([]);
@@ -24,13 +25,12 @@ export default function HomePage() {
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  // ✅ use token (not localStorage mismatch)
   const getHeaders = () => ({
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
   });
 
-  // ✅ fetch tasks (safe + correct endpoint)
+  // ✅ FETCH
   const fetchTasks = async () => {
     try {
       let url = `${API_URL}/tasks?page=${page}&limit=${limit}&search=${search}`;
@@ -48,19 +48,21 @@ export default function HomePage() {
       setTasks(data.data || []);
       setTotalPages(data.totalPages || 1);
     } catch (err) {
-      console.error(err);
+      toast.error("Session expired. Please login again");
       router.push("/login");
     }
   };
 
   useEffect(() => {
+    if (loading) return; // ⛔ wait
+  
     if (!token) {
       router.push("/login");
       return;
     }
-
+  
     fetchTasks();
-  }, [token, page, search, filter]);
+  }, [token, loading, page, search, filter]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -75,59 +77,78 @@ export default function HomePage() {
   // ✅ CREATE
   const addTask = async (task: any) => {
     try {
-      await fetch(`${API_URL}/tasks`, {
+      const res = await fetch(`${API_URL}/tasks`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify(task),
       });
+
+      if (!res.ok) throw new Error();
+
+      toast.success("Task added");
       fetchTasks();
-    } catch (err) {
-      console.error(err);
+      setOpen(false);
+    } catch {
+      toast.error("Failed to add task");
     }
   };
 
   // ✅ UPDATE
   const updateTask = async (id: string, task: any) => {
     try {
-      await fetch(`${API_URL}/tasks/${id}`, {
+      const res = await fetch(`${API_URL}/tasks/${id}`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify(task),
       });
+
+      if (!res.ok) throw new Error();
+
+      toast.success("Task updated");
       fetchTasks();
-    } catch (err) {
-      console.error(err);
+      setOpen(false);
+      setEditTask(null);
+    } catch {
+      toast.error("Failed to update task");
     }
   };
 
   // ✅ TOGGLE
   const toggleTask = async (id: string) => {
     try {
-      await fetch(`${API_URL}/tasks/${id}/toggle`, {
+      const res = await fetch(`${API_URL}/tasks/${id}/toggle`, {
         method: "PATCH",
         headers: getHeaders(),
       });
+
+      if (!res.ok) throw new Error();
+
+      toast.success("Task updated");
       fetchTasks();
-    } catch (err) {
-      console.error(err);
+    } catch {
+      toast.error("Toggle failed");
     }
   };
 
   // ✅ DELETE
   const deleteTask = async (id: string) => {
     try {
-      await fetch(`${API_URL}/tasks/${id}`, {
+      const res = await fetch(`${API_URL}/tasks/${id}`, {
         method: "DELETE",
         headers: getHeaders(),
       });
+
+      if (!res.ok) throw new Error();
+
+      toast.success("Task deleted");
       fetchTasks();
-    } catch (err) {
-      console.error(err);
+    } catch {
+      toast.error("Delete failed");
     }
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-w-xl mx-auto">
       {/* 🔍 Search */}
       <input
         type="text"
@@ -150,7 +171,10 @@ export default function HomePage() {
           Completed
         </button>
 
-        <button onClick={() => handleFilter("pending")} className="border px-2">
+        <button
+          onClick={() => handleFilter("pending")}
+          className="border px-2"
+        >
           Pending
         </button>
       </div>
@@ -174,7 +198,7 @@ export default function HomePage() {
         editTask={editTask}
       />
 
-      {/* 📋 Task List */}
+      {/* 📋 Tasks */}
       {tasks.map((t) => (
         <TaskItem
           key={t.id}

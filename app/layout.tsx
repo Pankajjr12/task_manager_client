@@ -9,7 +9,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="bg-gray-50 min-h-screen">
         <AuthProvider>
-          <Toaster position="top-right" />
+          <Toaster position="top-center" />
           <Navbar />
           <main>{children}</main>
         </AuthProvider>

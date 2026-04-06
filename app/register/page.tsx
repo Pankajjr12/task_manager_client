@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import API from "../../lib/api";
+import toast from "react-hot-toast";
+
 import { useRouter } from "next/navigation";
 
 export default function Register() {
@@ -10,8 +12,15 @@ export default function Register() {
   const [password, setPassword] = useState("");
 
   const handleRegister = async () => {
-    await API.post("/auth/register", { email, password });
-    router.push("/login");
+    try {
+      const res = await API.post("/auth/register", { email, password });
+  
+      toast.success("User registered successfully");
+  
+      router.push("/login");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Registration failed");
+    }
   };
 
   return (
